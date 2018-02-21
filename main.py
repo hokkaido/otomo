@@ -11,9 +11,11 @@ from vgg import Vgg19
 from PIL import Image
 parser = argparse.ArgumentParser(description='Neural Color Transfer between Images')
 parser.add_argument('--source-image', type=str, default='images/source_b.jpg',
-                                  help='path to source-image')
+                                help='path to source-image')
 parser.add_argument('--style-image', type=str, default='images/style_b.jpg',
-                                  help='path to style-image')
+                                help='path to style-image')
+parser.add_argument("--cuda", dest='feature', action='store_true')
+parser.set_defaults(cuda=False)
 
 def main():
     args = parser.parse_args()
@@ -58,7 +60,7 @@ def main():
     # res_image = transforms.ToPILImage()(img)
     # res_image.save('image2.png')
 
-    color_transfer = ColorTransfer(source_image, style_image)
+    color_transfer = ColorTransfer(source_image, style_image, args.cuda)
     color_transfer.run()
 
 #def denormalize(img):
@@ -66,10 +68,13 @@ def main():
 #    return denorm(img)
 
 class ColorTransfer(object):
-    def __init__(self, source_image, style_image):
+    def __init__(self, source_image, style_image, cuda):
         self.source_image = source_image
         self.style_image = style_image
+        self.cuda = cuda
         self.vgg19 = Vgg19()
+        if self.cuda:
+            self.vgg19.cuda()
 
     def run(self):
         S = utils.image_to_tensor(self.source_image)
@@ -90,19 +95,20 @@ class ColorTransfer(object):
 
     def _color_transfer(self, S, R, level = 5):
         F_S = self.vgg19(Variable(S.unsqueeze(0), requires_grad=False))[0].data.squeeze()
-        F_S5 = self.vgg19(Variable(S.unsqueeze(0), requires_grad=False))[4].data.squeeze()
-        F_R = self.vgg19(Variable(R.unsqueeze(0), requires_grad=False))[3].data.squeeze()
+        F_R = self.vgg19(Variable(R.unsqueeze(0), requires_grad=False))[0].data.squeeze()
 
         print(F_S.size())
         print(F_R.size())
 
-        F_S_img = self._feature_map_to_nnf(F_S, level)
-        F_S5_img = self._feature_map_to_nnf(F_S5, level)
-        F_R_img = self._feature_map_to_nnf(F_R, level)
+        L_S_to_R_nnf = NNF(np.asarray(F_S), np.asarray(F_R))
 
-        F_S_img.save('blahblah.png')
-        F_S_img.save('blahblah.png')
-        F_R_img.save('blablahbla.png')
+        #F_S_img = self._feature_map_to_nnf(F_S, level)
+        #F_S5_img = self._feature_map_to_nnf(F_S5, level)
+        #F_R_img = self._feature_map_to_nnf(F_R, level)
+
+        #F_S_img.save('blahblah.png')
+        #F_S_img.save('blahblah.png')
+        #F_R_img.save('blablahbla.png')
 
         # L_S_to_R_nnf = NNF(np.asarray(F_S_img), np.asarray(F_R_img))
         # L_S_to_R_nnf.solve()
