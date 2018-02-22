@@ -1,13 +1,15 @@
-
-# https://github.com/Aixile/PatchMatch/blob/master/patchmatch.py
-
 import numpy as np
 
-class NNF:
-    def __init__(self, img_a, img_b, boxsize=7):
-        self.A = img_a
-        self.B = img_b
-        self.boxsize = boxsize//2
+class PatchMatch:
+    def __init__(self, a, b, patchsize = 3):
+        """
+        a -- ndarray with dimensions (channels, height, width)
+        b -- ndarray with dimensions(channels, height, width)
+        patchsize -- (default 3)
+        """
+        self.a = a
+        self.b = b
+        self.patchsize = patchsize
         #return correspondences in three channels: x_coordinates, y_coordinates, offsets
         self.nnf = np.zeros((2, self.A.shape[0], self.A.shape[1])).astype(np.int)
         self.nnf_D = np.zeros((self.A.shape[0], self.A.shape[1]))
@@ -22,16 +24,27 @@ class NNF:
                 pos = self.nnf[i,j]
                 self.nnf_D[i,j] = self.cal_dist(i, j, pos[0], pos[1])
 
-    def cal_dist(self, ai ,aj, bi, bj):
-        dx0 = dy0 = self.boxsize//2
-        dx1 = dy1 = self.boxsize//2 + 1
-        dx0 = min(ai, bi, dx0)
-        dx1 = min(self.A.shape[0]-ai, self.B.shape[0]-bi, dx1)
-        dy0 = min(aj, bj, dy0)
-        dy1 = min(self.A.shape[1]-aj, self.B.shape[1]-bj, dy1)
-        return np.sum((self.A[ai-dx0:ai+dx1, aj-dy0:aj+dy1]-self.B[bi-dx0:bi+dx1, bj-dy0:bj+dy1])**2) / (dx1+dx0) / (dy1+dy0)
-        #self.nnf_D[i,j] =np.sum((self.A[i-dx0:i+dx1, j-dy0:j+dy1]-self.B[i-dx0:i+dx1, j-dy0:j+dy1])**2)
-    #def improve_guess(self,):
+    def cal_dist(self, ax ,ay, bx, by):
+        """Measures distance between 2 patches across all channels
+        ax -- x coordinate of patch a
+        ay -- y coordinate of patch a
+
+        bx -- x coordinate of patch b
+        by -- y coordinate of patch b
+        """
+
+        dmax = self.patchsize // 2
+        for dy in range(-dmax, dmax):
+            for dx in range(-dmax, dmax):
+                pixel_exists_in_a = (ay + dy) < self.a_height and (ay + dy) >= 0 and (ax + dx) < self.a_width and (ax + dx) >= 0
+                pixel_exists_in_b = (by + dy) < self.b_height and (by + dy) >= 0 and (bx + dx) < self.b_width and (bx + dx) >= 0
+                if pixel_exists_in_a and pixel_exists_in_b:
+                    for dc in range(0, self.channels):
+                        dp_tmp = self.a[dc, ay + dy, ax + dx] * b[dc, by + dy, bx + dx]
+                        pixel_sum -= dp_tmp
+                        dp_tmp = a1[dc * a_slice + (ay + dy) * a_pitch + (ax + dx)] * b1[dc * b_slice + (by + dy) * b_pitch + (bx + dx)]
+                        pixel_sum1 -= dp_tmp
+
 
 
     def improve_nnf(self, total_iter=5):
