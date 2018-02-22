@@ -1,14 +1,16 @@
 import torchvision.models as models
 import torchvision.transforms as transforms
+import torch.nn.functional as f
+
 from torch.autograd import Variable
 import numpy as np
 import argparse
-
-from patchmatch import NNF
-import utils
-from vgg import Vgg19
-
 from PIL import Image
+
+from patchmatch import PatchMatch
+from vgg import Vgg19
+import utils
+
 parser = argparse.ArgumentParser(description='Neural Color Transfer between Images')
 parser.add_argument('--source-image', type=str, default='images/source_b.jpg',
                                 help='path to source-image')
@@ -93,14 +95,32 @@ class ColorTransfer(object):
         #nnf_img = nnf_img.resize((int(nnf_img.width * scale_factor), int(nnf_img.height * scale_factor)))
         return nnf_img
 
+    def normalize_feat_map(self, feat_map):
+        """
+        Normalize the feature map along the channels dimension
+        feat_map is a numpy array with channels along the 1st dimension
+        """
+        return feat_map / np.linalg.norm(feat_map, ord=2 ,axis=(0), keepdims=True)
+
     def _color_transfer(self, S, R, level = 5):
+        """
+        Color transfer function, calls itself recursively
+
+        S -- source image at given level
+        level -- between 1 and 5 (default 5)
+        """
+
         F_S = self.vgg19(Variable(S.unsqueeze(0), requires_grad=False))[0].data.squeeze()
         F_R = self.vgg19(Variable(R.unsqueeze(0), requires_grad=False))[0].data.squeeze()
 
         print(F_S.size())
         print(F_R.size())
 
-        L_S_to_R_nnf = NNF(np.asarray(F_S), np.asarray(F_R))
+        L_S_to_R_nnf = PatchMatch(f.normalize(F_S, p = 2, dim = 0).numpy(),
+                                  f.normalize(F_R, p = 2, dim = 0).numpy())
+
+        print(L_S_to_R_nnf.cal_dist(0,0,10,15))
+
 
         #F_S_img = self._feature_map_to_nnf(F_S, level)
         #F_S5_img = self._feature_map_to_nnf(F_S5, level)

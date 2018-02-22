@@ -3,24 +3,34 @@ import numpy as np
 class PatchMatch:
     def __init__(self, a, b, patchsize = 3):
         """
+        Deep, generalized patch match
+
+        Takes two feature maps with dimensions (channels, height, width).
+
         a -- ndarray with dimensions (channels, height, width)
         b -- ndarray with dimensions(channels, height, width)
         patchsize -- (default 3)
         """
+        assert a.shape[0] == b.shape[0],  "channels don't match"
         self.a = a
+        self.a_height = self.a.shape[1]
+        self.a_width = self.a.shape[2]
         self.b = b
+        self.b_height = self.b.shape[1]
+        self.b_width = self.b.shape[2]
         self.patchsize = patchsize
+        self.channels = self.a.shape[0]
         #return correspondences in three channels: x_coordinates, y_coordinates, offsets
-        self.nnf = np.zeros((2, self.A.shape[0], self.A.shape[1])).astype(np.int)
-        self.nnf_D = np.zeros((self.A.shape[0], self.A.shape[1]))
+        self.nnf = np.zeros((self.a.shape[0], self.a.shape[0], self.a.shape[1])).astype(np.int)
+        self.nnf_D = np.zeros((self.a.shape[0], self.a.shape[1]))
         self.init_nnf()
 
     def init_nnf(self):
-        self.nnf[0] = np.random.randint(self.B.shape[0], size=(self.A.shape[0], self.A.shape[1]))
-        self.nnf[1] = np.random.randint(self.B.shape[1], size=(self.A.shape[0], self.A.shape[1]))
+        self.nnf[0] = np.random.randint(self.b.shape[1], size=(self.a.shape[0], self.a.shape[1]))
+        self.nnf[1] = np.random.randint(self.b.shape[1], size=(self.a.shape[0], self.a.shape[1]))
         self.nnf = self.nnf.transpose((1, 2 ,0))
-        for i in range(self.A.shape[0]):
-            for j in range(self.A.shape[1]):
+        for i in range(self.a.shape[0]):
+            for j in range(self.b.shape[1]):
                 pos = self.nnf[i,j]
                 self.nnf_D[i,j] = self.cal_dist(i, j, pos[0], pos[1])
 
@@ -32,7 +42,8 @@ class PatchMatch:
         bx -- x coordinate of patch b
         by -- y coordinate of patch b
         """
-
+        num_pixels = 0
+        pixel_sum = 0
         dmax = self.patchsize // 2
         for dy in range(-dmax, dmax):
             for dx in range(-dmax, dmax):
@@ -40,12 +51,11 @@ class PatchMatch:
                 pixel_exists_in_b = (by + dy) < self.b_height and (by + dy) >= 0 and (bx + dx) < self.b_width and (bx + dx) >= 0
                 if pixel_exists_in_a and pixel_exists_in_b:
                     for dc in range(0, self.channels):
-                        dp_tmp = self.a[dc, ay + dy, ax + dx] * b[dc, by + dy, bx + dx]
-                        pixel_sum -= dp_tmp
-                        dp_tmp = a1[dc * a_slice + (ay + dy) * a_pitch + (ax + dx)] * b1[dc * b_slice + (by + dy) * b_pitch + (bx + dx)]
-                        pixel_sum1 -= dp_tmp
+                        dp_tmp = self.a[dc, ay + dy, ax + dx] * self.b[dc, by + dy, bx + dx]
+                        pixel_sum += dp_tmp
 
-
+                num_pixels += 1
+        return num_pixels / pixel_sum
 
     def improve_nnf(self, total_iter=5):
         for iter in range(total_iter):
