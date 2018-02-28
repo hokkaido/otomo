@@ -16,14 +16,16 @@ parser.add_argument('--source-image', type=str, default='images/source_b.jpg',
                                 help='path to source-image')
 parser.add_argument('--style-image', type=str, default='images/style_b.jpg',
                                 help='path to style-image')
+parser.add_argument('--scale', type=float, default=None,
+                                help='factor to scale input images')
 parser.add_argument("--cuda", dest='feature', action='store_true')
 parser.set_defaults(cuda=False)
 
 def main():
     args = parser.parse_args()
 
-    source_image = utils.load_image(args.source_image)
-    style_image = utils.load_image(args.style_image)
+    source_image = utils.load_image(args.source_image, scale=args.scale)
+    style_image = utils.load_image(args.style_image, scale=args.scale)
 
     #min_width = min(source_image.width, style_image.width)
     #min_height = min(source_image.height, style_image.height)
@@ -83,7 +85,7 @@ class ColorTransfer(object):
         R = utils.image_to_tensor(self.style_image)
         self._color_transfer(S, R)
 
-    def _feature_map_to_nnf(self, feature_map, layer = 5):
+    def _feature_map_to_nnf(self, feature_map, layer=5):
         denormalize = transforms.Normalize((-2.12, -2.04, -1.80), (4.37, 4.46, 4.44))
         scale_factor = 1 / (layer - 1)
 
@@ -95,14 +97,7 @@ class ColorTransfer(object):
         #nnf_img = nnf_img.resize((int(nnf_img.width * scale_factor), int(nnf_img.height * scale_factor)))
         return nnf_img
 
-    def normalize_feat_map(self, feat_map):
-        """
-        Normalize the feature map along the channels dimension
-        feat_map is a numpy array with channels along the 1st dimension
-        """
-        return feat_map / np.linalg.norm(feat_map, ord=2 ,axis=(0), keepdims=True)
-
-    def _color_transfer(self, S, R, level = 5):
+    def _color_transfer(self, S, R, level=5):
         """
         Color transfer function, calls itself recursively
 
@@ -116,10 +111,21 @@ class ColorTransfer(object):
         print(F_S.size())
         print(F_R.size())
 
-        L_S_to_R_nnf = PatchMatch(f.normalize(F_S, p = 2, dim = 0).numpy(),
-                                  f.normalize(F_R, p = 2, dim = 0).numpy())
+        snn = PatchMatch(f.normalize(F_S, p=2, dim=0).numpy(),
+                         f.normalize(F_R, p=2, dim=0).numpy())
 
-        print(L_S_to_R_nnf.cal_dist(0,0,10,15))
+        snn.solve()
+
+        rnn = PatchMatch(f.normalize(F_R, p=2, dim=0).numpy(),
+                         f.normalize(F_S, p=2, dim=0).numpy())
+
+        rnn.solve()
+
+        snn_img = snn.reconstruct()
+        snn_img = Image.fromarray(snn_img.astype('uint8'))
+
+        snn_img.save('snn.png')
+        # image_r_to_s.save('image_r_to_s.png')
 
 
         #F_S_img = self._feature_map_to_nnf(F_S, level)
