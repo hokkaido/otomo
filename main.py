@@ -9,6 +9,7 @@ from PIL import Image
 
 from patchmatch import PatchMatch
 from vgg import Vgg19
+from bds import bds_vote
 import utils
 
 parser = argparse.ArgumentParser(description='Neural Color Transfer between Images')
@@ -120,6 +121,10 @@ class ColorTransfer(object):
                          f.normalize(F_S, p=2, dim=0).numpy())
 
         rnn.solve()
+
+        G = bds_vote(snn.nnf, rnn.nnf, R)
+
+        print(G)
 
         snn_img = snn.reconstruct()
         snn_img = Image.fromarray(snn_img.astype('uint8'))
