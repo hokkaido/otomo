@@ -122,14 +122,16 @@ class ColorTransfer(object):
 
         rnn.solve()
 
-        G = bds_vote(snn.nnf, rnn.nnf, R)
+        G = bds_vote(snn.nnf, rnn.nnf, snn.nnfd, rnn.nnfd, R)
 
         print(G)
 
-        snn_img = snn.reconstruct()
-        snn_img = Image.fromarray(snn_img.astype('uint8'))
+        utils.save_image('g.png', G)
 
-        snn_img.save('snn.png')
+        #snn_img = snn.reconstruct()
+        #snn_img = Image.fromarray(snn_img.astype('uint8'))
+
+
         # image_r_to_s.save('image_r_to_s.png')
 
 

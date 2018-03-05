@@ -8,7 +8,7 @@ class PatchMatch:
         Takes two feature maps with dimensions (channels, height, width).
 
         a -- ndarray with dimensions (channels, height, width)
-        b -- ndarray with dimensions(channels, height, width)
+        b -- ndarray with dimensions (channels, height, width)
         patchsize -- (default 3)
         """
         assert a.shape[0] == b.shape[0],  "channels don't match"
