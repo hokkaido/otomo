@@ -25,6 +25,10 @@ parser.set_defaults(cuda=False)
 def main():
     args = parser.parse_args()
 
+    if args.cuda and not torch.cuda.is_available():
+        print("Error: cuda is not available")
+        sys.exit(1)
+
     source_image = utils.load_image(args.source_image, scale=args.scale)
     style_image = utils.load_image(args.style_image, scale=args.scale)
 
@@ -78,7 +82,10 @@ class ColorTransfer(object):
         self.style_image = style_image
         self.cuda = cuda
         self.vgg19 = Vgg19()
+
         if self.cuda:
+            self.source_image = self.source_image.cuda()
+            self.style_image = self.style_image.cuda()
             self.vgg19.cuda()
 
     def run(self):
@@ -102,7 +109,8 @@ class ColorTransfer(object):
         """
         Color transfer function, calls itself recursively
 
-        S -- source image at given level
+        S -- source image at given level as a tensor with dim (channels, height, width)
+        R -- reference image as a tensor with dim (channels, height, width)
         level -- between 1 and 5 (default 5)
         """
 
@@ -112,13 +120,13 @@ class ColorTransfer(object):
         print(F_S.size())
         print(F_R.size())
 
-        snn = PatchMatch(f.normalize(F_S, p=2, dim=0).numpy(),
-                         f.normalize(F_R, p=2, dim=0).numpy())
+        snn = PatchMatch(f.normalize(F_S, p=2, dim=0),
+                         f.normalize(F_R, p=2, dim=0))
 
         snn.solve()
 
-        rnn = PatchMatch(f.normalize(F_R, p=2, dim=0).numpy(),
-                         f.normalize(F_S, p=2, dim=0).numpy())
+        rnn = PatchMatch(f.normalize(F_R, p=2, dim=0),
+                         f.normalize(F_S, p=2, dim=0))
 
         rnn.solve()
 
