@@ -23,7 +23,8 @@ def image_to_tensor(img, img_transforms = []):
     )
     transform = transforms.Compose(img_transforms + [
         transforms.ToTensor(),
-        normalize
+        #transforms.Lambda(lambda x: x.mul(255))
+        #normalize
     ])
     return transform(img)
 

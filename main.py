@@ -8,6 +8,7 @@ import argparse
 from PIL import Image
 
 from patchmatch import PatchMatch
+from patchmatch2 import PatchMatch2
 from vgg import Vgg19
 from bds import bds_vote
 import utils
@@ -18,7 +19,7 @@ parser.add_argument('--source-image', type=str, default='images/source_b.jpg',
 parser.add_argument('--style-image', type=str, default='images/style_b.jpg',
                                 help='path to style-image')
 parser.add_argument('--scale', type=float, default=None,
-                                help='factor to scale input images')
+                                help='factor to scale input images, eg. 0.5')
 parser.add_argument("--cuda", dest='feature', action='store_true')
 parser.set_defaults(cuda=False)
 
@@ -84,49 +85,55 @@ class ColorTransfer(object):
     def run(self):
         S = utils.image_to_tensor(self.source_image)
         R = utils.image_to_tensor(self.style_image)
+        print(S)
         self._color_transfer(S, R)
 
-    def _feature_map_to_nnf(self, feature_map, layer=5):
-        denormalize = transforms.Normalize((-2.12, -2.04, -1.80), (4.37, 4.46, 4.44))
-        scale_factor = 1 / (layer - 1)
+    def _resized_S(self, size):
+        return utils.image_to_tensor(self.source_image, [transforms.Resize(size)])
 
-        to_img = transforms.Compose([
-            denormalize,
-            transforms.ToPILImage()
-        ])
-        nnf_img = to_img(feature_map)
-        #nnf_img = nnf_img.resize((int(nnf_img.width * scale_factor), int(nnf_img.height * scale_factor)))
-        return nnf_img
+    def _resized_R(self, size):
+        return utils.image_to_tensor(self.style_image, [transforms.Resize(size)])
 
     def _color_transfer(self, S, R, level=5):
         """
         Color transfer function, calls itself recursively
 
-        S -- source image at given level
+        S -- source image at the given level (normalized tensor)
+        R -- reference image (normalized tensor)
         level -- between 1 and 5 (default 5)
         """
 
-        F_S = self.vgg19(Variable(S.unsqueeze(0), requires_grad=False))[0].data.squeeze()
-        F_R = self.vgg19(Variable(R.unsqueeze(0), requires_grad=False))[0].data.squeeze()
+        if level == 0:
+            return
+
+        F_S = self.vgg19(Variable(S.unsqueeze(0), requires_grad=False))[level - 1].data.squeeze()
+        F_R = self.vgg19(Variable(R.unsqueeze(0), requires_grad=False))[level - 1].data.squeeze()
 
         print(F_S.size())
         print(F_R.size())
 
-        snn = PatchMatch(f.normalize(F_S, p=2, dim=0).numpy(),
+        snn = PatchMatch2(f.normalize(F_S, p=2, dim=0).numpy(),
                          f.normalize(F_R, p=2, dim=0).numpy())
 
         snn.solve()
 
-        rnn = PatchMatch(f.normalize(F_R, p=2, dim=0).numpy(),
+        rnn = PatchMatch2(f.normalize(F_R, p=2, dim=0).numpy(),
                          f.normalize(F_S, p=2, dim=0).numpy())
 
         rnn.solve()
 
-        G = bds_vote(snn.nnf, rnn.nnf, snn.nnfd, rnn.nnfd, R)
+        # Resize R to feature map dimensions
+        R_L = self._resized_R(F_R.size()[1:3])
+
+        print(R_L)
+
+        G = bds_vote(snn.nnf.transpose(2,1,0), rnn.nnf.transpose(2,1,0), snn.nnd.transpose(1,0), rnn.nnd.transpose(1,0), R_L)
 
         print(G)
 
-        utils.save_image('g.png', G)
+        utils.save_image(f'g{level}.png', G*255.99)
+
+        #F_G = bds_vote(snn.nnf, rnn.nnf, snn.nnfd, rnn.nnfd, F_R)
 
         #snn_img = snn.reconstruct()
         #snn_img = Image.fromarray(snn_img.astype('uint8'))

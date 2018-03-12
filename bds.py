@@ -1,6 +1,6 @@
 import numpy as np
 
-def bds_vote(snn, rnn, snnd, rnnd, src, patchsize=3):
+def bds_vote(snn, rnn, snnd, rnnd, src, patchsize=5):
     """
     Reconstructs an image or feature map by bidirectionaly
     similarity voting
@@ -19,6 +19,9 @@ def bds_vote(snn, rnn, snnd, rnnd, src, patchsize=3):
 
     weights = np.zeros((dest_height, dest_width))
 
+    print(snn.shape)
+    ws = 1 / ((snn.shape[1] - patchsize + 1) * (snn.shape[2] - patchsize + 1))
+    wr = 1 / ((rnn.shape[1] - patchsize + 1) * (rnn.shape[2] - patchsize + 1))
     # coherence
     # The S->R forward NNF enforces coherence
     for i in range(src_width):
@@ -26,7 +29,6 @@ def bds_vote(snn, rnn, snnd, rnnd, src, patchsize=3):
 
             px = snn[0, i, j]
             py = snn[1, i, j]
-            w = snnd[i, j]
 
             for dy in range(j-pmax, j+pmax):
                 if j + dy < 0:
@@ -47,8 +49,8 @@ def bds_vote(snn, rnn, snnd, rnnd, src, patchsize=3):
                     if px + dx >= src_width:
                         break
                     for ch in range(channels):
-                        dest[ch, dy + j, dx + i] += w * src[ch, py + dy, px + dx]
-                    weights[dy + j, dx + i] += w
+                        dest[ch, dy + j, dx + i] += ws * src[ch, py + dy, px + dx]
+                    weights[dy + j, dx + i] += ws
 
 
     # completeness
@@ -58,7 +60,6 @@ def bds_vote(snn, rnn, snnd, rnnd, src, patchsize=3):
 
             px = rnn[0, i, j]
             py = rnn[1, i, j]
-            w = rnnd[i, j]
 
             for dy in range(j-pmax, j+pmax):
                 if j + dy < 0:
@@ -79,10 +80,13 @@ def bds_vote(snn, rnn, snnd, rnnd, src, patchsize=3):
                     if px + dx >= dest_width:
                         break
                     for ch in range(channels):
-                        dest[ch, py + dy, px + dx] += w * src[ch, dy + j, dx + i]
-                    weights[py + dy, px + dx] += w
+                        dest[ch, py + dy, px + dx] += wr * src[ch, dy + j, dx + i]
+                    weights[py + dy, px + dx] += wr
 
-    for ch in range(channels):
-        dest[ch] /= weights
+    for x in range(dest_width):
+        for y in range(dest_height):
+            s = 1 if weights[y, x] == 0 else (1 / weights[y, x])
+            for ch in range(channels):
+                dest[ch, y, x] *= s
 
     return dest
